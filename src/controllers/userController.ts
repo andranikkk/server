@@ -7,7 +7,6 @@ import {
 	generateAccessToken,
 	generateRefreshToken,
 } from '../services/tokenService.js'
-import type { AuthenticatedRequest } from '../middlewares/auth.js'
 
 export const signin = async (req: Request, res: Response) => {
 	try {
@@ -113,7 +112,7 @@ export const logout = async (req: Request, res: Response) => {
 	}
 }
 
-//** знаю, что есть баг - возвращается id пользователя даже после logout пока срок жизни токена не истек. Нет времени подключать Редис для черного списка аксесТокенов, с помощью которого можно было бы предотвратить успешный возврат id после logout */
+//** знаю, что есть баг - возвращается id пользователя даже после logout пока срок жизни токена не истек. Нет времени подключать Редис для черного списка аксесТокенов, с помощью которого можно было бы предотвратить успешный возврат id после logout. Или использовать device-level tracking подход. В общем, есть много вариантов.. */
 export const getInfo = (req: any, res: Response) => {
 	const user = req.user as { userId: string }
 	res.json({ id: user.userId })

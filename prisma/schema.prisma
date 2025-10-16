@@ -16,6 +16,7 @@ model Users {
   updated_at DateTime @updatedAt
 
   tokens RefreshToken[]
+  file   File[]
 }
 
 model RefreshToken {
@@ -25,4 +26,18 @@ model RefreshToken {
 
   userId String
   user   Users  @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id         String   @id @default(uuid())
+  name       String
+  extension  String
+  mimeType   String
+  size       Int
+  path       String
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId String
+  user   Users  @relation(fields: [userId], references: [id])
 }
