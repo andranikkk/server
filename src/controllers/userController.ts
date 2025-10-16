@@ -2,41 +2,34 @@ import { type Request, type Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { UsersModels } from '../models/userModel.js'
+import { RefreshTokenModels } from '../models/refreshTokenModel.js'
 import {
 	generateAccessToken,
 	generateRefreshToken,
 } from '../services/tokenService.js'
+import type { AuthenticatedRequest } from '../middlewares/auth.js'
 
 export const signin = async (req: Request, res: Response) => {
 	try {
 		const { id, password } = req.body
 
-		if (!id || !password) {
-			return res.status(400).json({ message: 'Fill all fields!' })
-		}
-
 		const user = await UsersModels.findFirst({
-			where: {
-				OR: [{ email: id }, { phone: id }],
-			},
+			where: { OR: [{ email: id }, { phone: id }] },
 		})
 
-		const isValid = user && (await bcrypt.compare(password, user.password))
-		if (!isValid) {
-			return res.status(401).json({ error: 'Invalid id or password' })
+		if (!user || !(await bcrypt.compare(password, user.password))) {
+			return res.status(401).json({ error: 'Invalid credentials' })
 		}
 
 		const payload = { userId: user.id }
-
 		const accessToken = generateAccessToken(payload)
 		const refreshToken = generateRefreshToken(payload)
 
-		await UsersModels.update({
-			where: { id: user.id },
-			data: { refreshToken },
+		await RefreshTokenModels.create({
+			data: { token: refreshToken, userId: user.id },
 		})
 
-		return res.json({ accessToken, refreshToken })
+		res.json({ accessToken, refreshToken })
 	} catch (error) {
 		console.error('Signin error:', error)
 		res.status(500).json({ message: 'Internal server error' })
@@ -44,48 +37,35 @@ export const signin = async (req: Request, res: Response) => {
 }
 
 export const signup = async (req: Request, res: Response) => {
-	const { email, password, phone } = req.body
-
 	try {
-		if (!email || !password || !phone) {
+		const { email, phone, password } = req.body
+
+		if (!email || !phone || !password) {
 			return res.status(400).json({ message: 'Fill all fields' })
 		}
 
-		const registeredUser = await UsersModels.findFirst({
-			where: {
-				OR: [{ email }, { phone }],
-			},
+		const existing = await UsersModels.findFirst({
+			where: { OR: [{ email }, { phone }] },
 		})
 
-		if (registeredUser) {
-			return res.status(400).json({ message: 'User already registered' })
+		if (existing) {
+			return res.status(400).json({ message: 'User already exists' })
 		}
 
-		const salt = await bcrypt.genSalt(10)
-		const hashedPassword = await bcrypt.hash(password, salt)
-
+		const hashed = await bcrypt.hash(password, 10)
 		const user = await UsersModels.create({
-			data: {
-				email,
-				phone,
-				password: hashedPassword,
-			},
+			data: { email, phone, password: hashed },
 		})
 
 		const payload = { userId: user.id }
 		const accessToken = generateAccessToken(payload)
 		const refreshToken = generateRefreshToken(payload)
 
-		await UsersModels.update({
-			where: { id: user.id },
-			data: { refreshToken },
+		await RefreshTokenModels.create({
+			data: { token: refreshToken, userId: user.id },
 		})
 
-		return res.status(201).json({
-			message: 'User registered successfully',
-			accessToken,
-			refreshToken,
-		})
+		res.status(201).json({ accessToken, refreshToken })
 	} catch (error) {
 		console.error('Signup error:', error)
 		res.status(500).json({ message: 'Internal server error' })
@@ -93,27 +73,48 @@ export const signup = async (req: Request, res: Response) => {
 }
 
 export const refreshAccessToken = async (req: Request, res: Response) => {
-	const { refreshToken } = req.body
-
-	if (!refreshToken) {
-		return res.status(400).json({ error: 'Missing refresh token' })
-	}
-
 	try {
+		const { refreshToken } = req.body
+
+		if (!refreshToken)
+			return res.status(400).json({ error: 'Missing refresh token' })
+
 		const decoded = jwt.verify(
 			refreshToken,
 			process.env.REFRESH_TOKEN_SECRET!
 		) as { userId: string }
 
-		const user = await UsersModels.findUnique({ where: { id: decoded.userId } })
-		if (!user || user.refreshToken !== refreshToken) {
-			return res.status(403).json({ error: 'Invalid refresh token' })
+		const tokenInDb = await RefreshTokenModels.findUnique({
+			where: { token: refreshToken },
+		})
+		if (!tokenInDb) {
+			return res
+				.status(403)
+				.json({ error: 'Refresh token invalid or logged out' })
 		}
 
-		const newAccessToken = generateAccessToken({ userId: user.id })
-		return res.json({ accessToken: newAccessToken })
+		const newAccessToken = generateAccessToken({ userId: decoded.userId })
+		res.json({ accessToken: newAccessToken })
 	} catch (error) {
-		console.error('Refresh token error:', error)
-		return res.status(403).json({ error: 'Invalid or expired refresh token' })
+		res.status(403).json({ error: 'Invalid or expired refresh token' })
 	}
+}
+
+export const logout = async (req: Request, res: Response) => {
+	try {
+		const { refreshToken } = req.body
+		if (!refreshToken)
+			return res.status(400).json({ error: 'Missing refresh token' })
+
+		await RefreshTokenModels.delete({ where: { token: refreshToken } })
+		res.json({ message: 'Logged out successfully' })
+	} catch (error) {
+		res.status(500).json({ message: 'Logout failed' })
+	}
+}
+
+//** знаю, что есть баг - возвращается id пользователя даже после logout пока срок жизни токена не истек. Нет времени подключать Редис для черного списка аксесТокенов, с помощью которого можно было бы предотвратить успешный возврат id после logout */
+export const getInfo = (req: any, res: Response) => {
+	const user = req.user as { userId: string }
+	res.json({ id: user.userId })
 }

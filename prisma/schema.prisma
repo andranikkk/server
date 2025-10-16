@@ -12,8 +12,17 @@ model Users {
   email      String   @unique
   phone      String   @unique
   password   String
-  updated_at DateTime @default(now())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tokens RefreshToken[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique @db.VarChar(512)
   created_at DateTime @default(now())
 
-  refreshToken String? @db.Text
+  userId String
+  user   Users  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

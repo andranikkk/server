@@ -37,7 +37,7 @@ app.use(express.json({ limit: '100mb' }))
 app.use(express.urlencoded({ extended: false }))
 app.use(express.static(path.join(__dirname, '../static')))
 
-app.use('/api', router)
+app.use('/', router)
 
 app.listen(PORT, () => {
 	console.log(`Server listening on port ${PORT}`)

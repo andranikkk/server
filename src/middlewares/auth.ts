@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import jwt, { type JwtPayload } from 'jsonwebtoken'
 
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
 	user?: string | JwtPayload
 }
 
@@ -12,7 +12,7 @@ const authenticateToken = (
 ) => {
 	try {
 		const authHeader = req.headers['authorization']
-		const token = authHeader && authHeader.split(' ')[1] // "Bearer <token>"
+		const token = authHeader && authHeader.split(' ')[1]
 
 		if (!token) {
 			return res.status(401).json({ error: 'Access token missing' })
