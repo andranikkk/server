@@ -12,7 +12,7 @@ import {
 
 const router = Router()
 
-router.post('/upload', authenticateToken, upload.single('file'), uploadFile)
+router.post('/upload', authenticateToken, upload.array('file'), uploadFile)
 router.get('/list', authenticateToken, listFiles)
 router.get('/:id', authenticateToken, getFileInfo)
 router.get('/download/:id', authenticateToken, downloadFile)

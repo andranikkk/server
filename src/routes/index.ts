@@ -5,6 +5,6 @@ import fileRoutes from './fileRoutes.js'
 const router = Router()
 
 router.use('/', userRoutes)
-router.use('/', fileRoutes)
+router.use('/file', fileRoutes)
 
 export default router
